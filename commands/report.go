@@ -33,7 +33,7 @@ import (
 	"github.com/kotakanbe/go-cve-dictionary/log"
 )
 
-// ReportCmd is Subcommand of host discovery mode
+// ReportCmd is subcommand for reporting
 type ReportCmd struct {
 	lang               string
 	debug              bool
