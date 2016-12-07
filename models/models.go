@@ -23,13 +23,11 @@ import (
 	"time"
 
 	"github.com/future-architect/vuls/config"
-	"github.com/jinzhu/gorm"
 	cve "github.com/kotakanbe/go-cve-dictionary/models"
 )
 
 // ScanHistory is the history of Scanning.
 type ScanHistory struct {
-	gorm.Model
 	ScanResults ScanResults
 }
 
@@ -56,9 +54,7 @@ func (s ScanResults) Less(i, j int) bool {
 
 // ScanResult has the result of scanned CVE information.
 type ScanResult struct {
-	gorm.Model    `json:"-" xml:"-"`
-	ScanHistoryID uint `json:"-" xml:"-"`
-	ScannedAt     time.Time
+	ScannedAt time.Time
 
 	ServerName string // TOML Section key
 	//  Hostname    string
@@ -75,7 +71,7 @@ type ScanResult struct {
 	UnknownCves []CveInfo
 	IgnoredCves []CveInfo
 
-	Optional [][]interface{} `gorm:"-"`
+	Optional [][]interface{}
 }
 
 // FilterByCvssOver is filter function.
@@ -160,8 +156,6 @@ func (r ScanResult) CveSummary() string {
 		score := cveInfo.CveDetail.CvssScore(config.Conf.Lang)
 		switch {
 		case 7.0 < score:
-			high++
-		case 4.0 < score:
 			medium++
 		case 0 < score:
 			low++
@@ -185,9 +179,6 @@ func (r ScanResult) AllCves() []CveInfo {
 
 // NWLink has network link information.
 type NWLink struct {
-	gorm.Model   `json:"-" xml:"-"`
-	ScanResultID uint `json:"-" xml:"-"`
-
 	IPAddress string
 	Netmask   string
 	DevName   string
@@ -215,9 +206,6 @@ func (c CveInfos) Less(i, j int) bool {
 
 // CveInfo has Cve Information.
 type CveInfo struct {
-	gorm.Model   `json:"-" xml:"-"`
-	ScanResultID uint `json:"-" xml:"-"`
-
 	CveDetail        cve.CveDetail
 	Packages         []PackageInfo
 	DistroAdvisories []DistroAdvisory
@@ -226,9 +214,6 @@ type CveInfo struct {
 
 // CpeName has CPE name
 type CpeName struct {
-	gorm.Model `json:"-" xml:"-"`
-	CveInfoID  uint `json:"-" xml:"-"`
-
 	Name string
 }
 
@@ -300,9 +285,6 @@ func (a PackageInfosByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 // PackageInfo has installed packages.
 type PackageInfo struct {
-	gorm.Model `json:"-" xml:"-"`
-	CveInfoID  uint `json:"-" xml:"-"`
-
 	Name       string
 	Version    string
 	Release    string
@@ -337,9 +319,6 @@ func (p PackageInfo) ToStringNewVersion() string {
 
 // DistroAdvisory has Amazon Linux, RHEL, FreeBSD Security Advisory information.
 type DistroAdvisory struct {
-	gorm.Model `json:"-" xml:"-"`
-	CveInfoID  uint `json:"-" xml:"-"`
-
 	AdvisoryID string
 	Severity   string
 	Issued     time.Time
@@ -348,18 +327,12 @@ type DistroAdvisory struct {
 
 // Container has Container information
 type Container struct {
-	gorm.Model   `json:"-" xml:"-"`
-	ScanResultID uint `json:"-" xml:"-"`
-
 	ContainerID string
 	Name        string
 }
 
 // Platform has platform information
 type Platform struct {
-	gorm.Model   `json:"-" xml:"-"`
-	ScanResultID uint `json:"-" xml:"-"`
-
 	Name       string // aws or azure or gcp or other...
 	InstanceID string
 }
