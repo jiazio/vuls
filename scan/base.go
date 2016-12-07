@@ -225,7 +225,7 @@ func (l base) isAwsInstanceID(str string) bool {
 
 func (l *base) convertToModel() (models.ScanResult, error) {
 	var scoredCves, unscoredCves, ignoredCves models.CveInfos
-	for _, p := range l.UnsecurePackages {
+	for _, p := range l.VulnInfos {
 		sort.Sort(models.PackageInfosByName(p.Packs))
 
 		// ignoreCves
@@ -296,13 +296,13 @@ func (l *base) convertToModel() (models.ScanResult, error) {
 
 // scanVulnByCpeName search vulnerabilities that specified in config file.
 func (l *base) scanVulnByCpeName() error {
-	unsecurePacks := CvePacksList{}
+	unsecurePacks := VulnInfos{}
 
 	serverInfo := l.getServerInfo()
 	cpeNames := serverInfo.CpeNames
 
-	// remove duplicate
-	set := map[string]CvePacksInfo{}
+	// For remove duplicate
+	set := map[string]VulnInfo{}
 
 	for _, name := range cpeNames {
 		details, err := cveapi.CveClient.FetchCveDetailsByCpeName(name)
@@ -316,7 +316,7 @@ func (l *base) scanVulnByCpeName() error {
 				val.CpeNames = names
 				set[detail.CveID] = val
 			} else {
-				set[detail.CveID] = CvePacksInfo{
+				set[detail.CveID] = VulnInfo{
 					CveID:     detail.CveID,
 					CveDetail: detail,
 					CpeNames:  []string{name},
@@ -328,8 +328,8 @@ func (l *base) scanVulnByCpeName() error {
 	for key := range set {
 		unsecurePacks = append(unsecurePacks, set[key])
 	}
-	unsecurePacks = append(unsecurePacks, l.UnsecurePackages...)
-	l.setUnsecurePackages(unsecurePacks)
+	unsecurePacks = append(unsecurePacks, l.VulnInfos...)
+	l.setVulnInfos(unsecurePacks)
 	return nil
 }
 

@@ -37,7 +37,6 @@ import (
 
 // ScanCmd is Subcommand of host discovery mode
 type ScanCmd struct {
-	lang             string
 	debug            bool
 	debugSQL         bool
 	configPath       string
@@ -63,7 +62,6 @@ func (*ScanCmd) Synopsis() string { return "Scan vulnerabilities" }
 func (*ScanCmd) Usage() string {
 	return `scan:
 	scan
-		[-lang=en|ja]
 		[-config=/path/to/config.toml]
 		[-results-dir=/path/to/results]
 		[-cve-dictionary-dbtype=sqlite3|mysql]
@@ -84,7 +82,6 @@ func (*ScanCmd) Usage() string {
 
 // SetFlags set flag
 func (p *ScanCmd) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&p.lang, "lang", "en", "[en|ja]")
 	f.BoolVar(&p.debug, "debug", false, "debug mode")
 	f.BoolVar(&p.debugSQL, "debug-sql", false, "SQL debug mode")
 
@@ -222,7 +219,6 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 	}
 	logrus.Debugf("%s", pp.Sprintf("%v", target))
 
-	c.Conf.Lang = p.lang
 	c.Conf.DebugSQL = p.debugSQL
 
 	// logger

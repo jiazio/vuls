@@ -31,9 +31,9 @@ func TestPackageCveInfosSetGet(t *testing.T) {
 	}
 
 	//  var ps packageCveInfos
-	var ps CvePacksList
+	var ps VulnInfos
 	for _, cid := range test.in {
-		ps = ps.set(cid, CvePacksInfo{CveID: cid})
+		ps = ps.set(cid, VulnInfo{CveID: cid})
 	}
 
 	if len(test.out) != len(ps) {
@@ -61,7 +61,7 @@ func TestGetScanResults(t *testing.T) {
 	deb1 := newDebian(c)
 	deb2 := newDebian(c)
 
-	cpis1 := []CvePacksInfo{
+	vi1 := []VulnInfo{
 		{
 			CveID:     "CVE1",
 			CveDetail: cve.CveDetail{CveID: "CVE1"},
@@ -81,7 +81,7 @@ func TestGetScanResults(t *testing.T) {
 			},
 		},
 	}
-	cpis2 := []CvePacksInfo{
+	vi2 := []VulnInfo{
 		{
 			CveID:     "CVE3",
 			CveDetail: cve.CveDetail{CveID: "CVE3"},
@@ -99,10 +99,10 @@ func TestGetScanResults(t *testing.T) {
 			},
 		},
 	}
-	deb1.setUnsecurePackages(cpis1)
+	deb1.setVulnInfos(vi1)
 	servers = append(servers, deb1)
 
-	deb2.setUnsecurePackages(cpis2)
+	deb2.setVulnInfos(vi2)
 	servers = append(servers, deb2)
 
 	// prepare expected data

@@ -61,6 +61,7 @@ func toShortPlainText(r models.ScanResult) string {
 	header := fmt.Sprintf("%s\n%s",
 		r.ServerInfo(), buf.String())
 
+	//TODO show a summary of upgradable packages
 	if len(cves) == 0 {
 		return fmt.Sprintf(`
 %s
@@ -128,6 +129,7 @@ func toFullPlainText(r models.ScanResult) string {
 	header := fmt.Sprintf("%s\n%s",
 		serverInfo, buf.String())
 
+	//TODO show a summary of upgradable packages
 	if len(r.KnownCves) == 0 && len(r.UnknownCves) == 0 {
 		return fmt.Sprintf(`
 %s

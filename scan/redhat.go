@@ -189,12 +189,12 @@ func (o *redhat) scanPackages() error {
 	}
 	o.setPackages(packs)
 
-	var unsecurePacks []CvePacksInfo
-	if unsecurePacks, err = o.scanUnsecurePackages(); err != nil {
+	var vinfos []VulnInfo
+	if vinfos, err = o.scanVulnInfos(); err != nil {
 		o.log.Errorf("Failed to scan vulnerable packages")
 		return err
 	}
-	o.setUnsecurePackages(unsecurePacks)
+	o.setVulnInfos(vinfos)
 	return nil
 }
 
@@ -235,7 +235,7 @@ func (o *redhat) parseScannedPackagesLine(line string) (models.PackageInfo, erro
 	}, nil
 }
 
-func (o *redhat) scanUnsecurePackages() ([]CvePacksInfo, error) {
+func (o *redhat) scanVulnInfos() ([]VulnInfo, error) {
 	if o.Distro.Family != "centos" {
 		// Amazon, RHEL has yum updateinfo as default
 		// yum updateinfo can collenct vendor advisory information.
@@ -247,7 +247,7 @@ func (o *redhat) scanUnsecurePackages() ([]CvePacksInfo, error) {
 }
 
 // For CentOS
-func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (CvePacksList, error) {
+func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (VulnInfos, error) {
 	cmd := "LANGUAGE=en_US.UTF-8 yum --color=never %s check-update"
 	if o.getServerInfo().Enablerepo != "" {
 		cmd = fmt.Sprintf(cmd, "--enablerepo="+o.getServerInfo().Enablerepo)
@@ -355,17 +355,16 @@ func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (CvePacksList, error)
 	}
 	o.log.Info("Done")
 
-	cvePacksList := []CvePacksInfo{}
+	vinfos := []VulnInfo{}
 	for _, detail := range cveDetails {
 		// Amazon, RHEL do not use this method, so VendorAdvisory do not set.
-		cvePacksList = append(cvePacksList, CvePacksInfo{
+		vinfos = append(vinfos, VulnInfo{
 			CveID:     detail.CveID,
 			CveDetail: detail,
 			Packs:     cveIDPackInfoMap[detail.CveID],
-			//  CvssScore: cinfo.CvssScore(conf.Lang),
 		})
 	}
-	return cvePacksList, nil
+	return vinfos, nil
 }
 
 // parseYumCheckUpdateLines parse yum check-update to get package name, candidate version
@@ -575,11 +574,11 @@ type distroAdvisoryCveIDs struct {
 
 // Scaning unsecure packages using yum-plugin-security.
 // Amazon, RHEL
-func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (CvePacksList, error) {
+func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (VulnInfos, error) {
 	if o.Distro.Family == "centos" {
 		// CentOS has no security channel.
 		// So use yum check-update && parse changelog
-		return CvePacksList{}, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"yum updateinfo is not suppported on CentOS")
 	}
 
@@ -634,14 +633,14 @@ func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (CvePacksList, err
 	}
 	advisoryCveIDsList, err := o.parseYumUpdateinfo(r.Stdout)
 	if err != nil {
-		return CvePacksList{}, err
+		return nil, err
 	}
 	//  pp.Println(advisoryCveIDsList)
 
 	// All information collected.
-	// Convert to CvePacksList.
+	// Convert to VulnInfos.
 	o.log.Info("Fetching CVE details...")
-	result := CvePacksList{}
+	vinfos := VulnInfos{}
 	for _, advIDCveIDs := range advisoryCveIDsList {
 		cveDetails, err :=
 			cveapi.CveClient.FetchCveDetails(advIDCveIDs.CveIDs)
@@ -651,31 +650,31 @@ func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (CvePacksList, err
 
 		for _, cveDetail := range cveDetails {
 			found := false
-			for i, p := range result {
+			for i, p := range vinfos {
 				if cveDetail.CveID == p.CveID {
 					advAppended := append(p.DistroAdvisories, advIDCveIDs.DistroAdvisory)
-					result[i].DistroAdvisories = advAppended
+					vinfos[i].DistroAdvisories = advAppended
 
 					packs := dict[advIDCveIDs.DistroAdvisory.AdvisoryID]
-					result[i].Packs = append(result[i].Packs, packs...)
+					vinfos[i].Packs = append(vinfos[i].Packs, packs...)
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				cpinfo := CvePacksInfo{
+				cpinfo := VulnInfo{
 					CveID:            cveDetail.CveID,
 					CveDetail:        cveDetail,
 					DistroAdvisories: []models.DistroAdvisory{advIDCveIDs.DistroAdvisory},
 					Packs:            dict[advIDCveIDs.DistroAdvisory.AdvisoryID],
 				}
-				result = append(result, cpinfo)
+				vinfos = append(vinfos, cpinfo)
 			}
 		}
 	}
 	o.log.Info("Done")
-	return result, nil
+	return vinfos, nil
 }
 
 var horizontalRulePattern = regexp.MustCompile(`^=+$`)

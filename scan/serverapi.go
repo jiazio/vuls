@@ -74,22 +74,22 @@ type osPackages struct {
 	Packages models.PackageInfoList
 
 	// unsecure packages
-	UnsecurePackages CvePacksList
+	VulnInfos VulnInfos
 }
 
 func (p *osPackages) setPackages(pi models.PackageInfoList) {
 	p.Packages = pi
 }
 
-func (p *osPackages) setUnsecurePackages(pi []CvePacksInfo) {
-	p.UnsecurePackages = pi
+func (p *osPackages) setVulnInfos(vi []VulnInfo) {
+	p.VulnInfos = vi
 }
 
-// CvePacksList have CvePacksInfo list, getter/setter, sortable methods.
-type CvePacksList []CvePacksInfo
+// VulnInfos is VulnInfo list, getter/setter, sortable methods.
+type VulnInfos []VulnInfo
 
-// CvePacksInfo hold the CVE information.
-type CvePacksInfo struct {
+// VulnInfo holds a vulnerability information and unsecure packages
+type VulnInfo struct {
 	CveID            string
 	CveDetail        cve.CveDetail
 	Packs            models.PackageInfoList
@@ -98,38 +98,38 @@ type CvePacksInfo struct {
 }
 
 // FindByCveID find by CVEID
-func (s CvePacksList) FindByCveID(cveID string) (pi CvePacksInfo, found bool) {
+func (s VulnInfos) FindByCveID(cveID string) (VulnInfo, bool) {
 	for _, p := range s {
 		if cveID == p.CveID {
 			return p, true
 		}
 	}
-	return CvePacksInfo{CveID: cveID}, false
+	return VulnInfo{CveID: cveID}, false
 }
 
 // immutable
-func (s CvePacksList) set(cveID string, cvePacksInfo CvePacksInfo) CvePacksList {
+func (s VulnInfos) set(cveID string, v VulnInfo) VulnInfos {
 	for i, p := range s {
 		if cveID == p.CveID {
-			s[i] = cvePacksInfo
+			s[i] = v
 			return s
 		}
 	}
-	return append(s, cvePacksInfo)
+	return append(s, v)
 }
 
 // Len implement Sort Interface
-func (s CvePacksList) Len() int {
+func (s VulnInfos) Len() int {
 	return len(s)
 }
 
 // Swap implement Sort Interface
-func (s CvePacksList) Swap(i, j int) {
+func (s VulnInfos) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
 // Less implement Sort Interface
-func (s CvePacksList) Less(i, j int) bool {
+func (s VulnInfos) Less(i, j int) bool {
 	return s[i].CveDetail.CvssScore(config.Conf.Lang) >
 		s[j].CveDetail.CvssScore(config.Conf.Lang)
 }

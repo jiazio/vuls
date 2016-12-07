@@ -87,12 +87,12 @@ func (o *bsd) scanPackages() error {
 	}
 	o.setPackages(packs)
 
-	var unsecurePacks []CvePacksInfo
-	if unsecurePacks, err = o.scanUnsecurePackages(); err != nil {
+	var vinfos []VulnInfo
+	if vinfos, err = o.scanUnsecurePackages(); err != nil {
 		o.log.Errorf("Failed to scan vulnerable packages")
 		return err
 	}
-	o.setUnsecurePackages(unsecurePacks)
+	o.setVulnInfos(vinfos)
 	return nil
 }
 
@@ -105,7 +105,7 @@ func (o *bsd) scanInstalledPackages() ([]models.PackageInfo, error) {
 	return o.parsePkgVersion(r.Stdout), nil
 }
 
-func (o *bsd) scanUnsecurePackages() (cvePacksList []CvePacksInfo, err error) {
+func (o *bsd) scanUnsecurePackages() (vulnInfos []VulnInfo, err error) {
 	const vulndbPath = "/tmp/vuln.db"
 	cmd := "rm -f " + vulndbPath
 	r := o.ssh(cmd, noSudo)
@@ -120,7 +120,7 @@ func (o *bsd) scanUnsecurePackages() (cvePacksList []CvePacksInfo, err error) {
 	}
 	if r.ExitStatus == 0 {
 		// no vulnerabilities
-		return []CvePacksInfo{}, nil
+		return []VulnInfo{}, nil
 	}
 
 	var packAdtRslt []pkgAuditResult
@@ -175,7 +175,7 @@ func (o *bsd) scanUnsecurePackages() (cvePacksList []CvePacksInfo, err error) {
 			})
 		}
 
-		cvePacksList = append(cvePacksList, CvePacksInfo{
+		vulnInfos = append(vulnInfos, VulnInfo{
 			CveID:            d.CveID,
 			CveDetail:        d,
 			Packs:            packs,
