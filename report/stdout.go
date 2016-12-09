@@ -22,16 +22,36 @@ import (
 
 	c "github.com/future-architect/vuls/config"
 	"github.com/future-architect/vuls/models"
+	"github.com/gosuri/uitable"
 )
 
 // StdoutWriter write to stdout
 type StdoutWriter struct{}
 
+// WriteScanSummary prints Scan summary at the end of scan
+func (w StdoutWriter) WriteScanSummary(rs ...models.ScanResult) {
+	table := uitable.New()
+	table.MaxColWidth = maxColWidth
+	table.Wrap = true
+	for _, r := range rs {
+		cols := []interface{}{
+			r.ServerName,
+			fmt.Sprintf("%s%s", r.Family, r.Release),
+			fmt.Sprintf("%d CVEs", len(r.ScannedCves)),
+		}
+		table.AddRow(cols...)
+	}
+	fmt.Printf("\n\n")
+	fmt.Printf("Scan Summary\n")
+	fmt.Printf("============\n")
+	fmt.Printf("%s\n", table)
+}
+
 func (w StdoutWriter) Write(rs ...models.ScanResult) error {
 	if c.Conf.FormatOneLineText {
 		fmt.Print("\n\n")
-		fmt.Println("Scan Summary")
-		fmt.Println("============")
+		fmt.Println("One Line Summary")
+		fmt.Println("================")
 		fmt.Println(toOneLineSummary(rs))
 		fmt.Print("\n")
 	}

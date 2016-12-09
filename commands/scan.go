@@ -267,6 +267,7 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 		}
 		return subcommands.ExitFailure
 	}
+	fmt.Printf("\n\n\n")
 	fmt.Println("To view the detail, vuls tui is useful.")
 	fmt.Println("To send a report, run vuls report -h.")
 

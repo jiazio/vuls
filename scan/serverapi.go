@@ -30,7 +30,6 @@ import (
 	"github.com/future-architect/vuls/config"
 	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/report"
-	"github.com/k0kubun/pp"
 )
 
 // Log for localhsot
@@ -529,13 +528,8 @@ func scanVulns(jsonDir string, scannedAt time.Time) []error {
 		return nil
 	}, timeoutSec)
 
-	//TODO
-	pp.Println(results)
-
-	config.Conf.FormatOneLineText = true
 	config.Conf.FormatJSON = true
 	ws := []report.ResultWriter{
-		report.StdoutWriter{},
 		report.LocalFileWriter{CurrentDir: jsonDir},
 	}
 	for _, w := range ws {
@@ -545,10 +539,11 @@ func scanVulns(jsonDir string, scannedAt time.Time) []error {
 			}
 		}
 	}
-
 	if errs != nil {
 		return errs
 	}
+
+	report.StdoutWriter{}.WriteScanSummary(results...)
 	return nil
 }
 
