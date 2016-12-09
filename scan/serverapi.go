@@ -30,7 +30,7 @@ import (
 	"github.com/future-architect/vuls/config"
 	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/report"
-	cve "github.com/kotakanbe/go-cve-dictionary/models"
+	"github.com/k0kubun/pp"
 )
 
 // Log for localhsot
@@ -74,64 +74,15 @@ type osPackages struct {
 	Packages models.PackageInfoList
 
 	// unsecure packages
-	VulnInfos VulnInfos
+	VulnInfos models.VulnInfos
 }
 
 func (p *osPackages) setPackages(pi models.PackageInfoList) {
 	p.Packages = pi
 }
 
-func (p *osPackages) setVulnInfos(vi []VulnInfo) {
+func (p *osPackages) setVulnInfos(vi []models.VulnInfo) {
 	p.VulnInfos = vi
-}
-
-// VulnInfos is VulnInfo list, getter/setter, sortable methods.
-type VulnInfos []VulnInfo
-
-// VulnInfo holds a vulnerability information and unsecure packages
-type VulnInfo struct {
-	CveID            string
-	CveDetail        cve.CveDetail
-	Packs            models.PackageInfoList
-	DistroAdvisories []models.DistroAdvisory // for Aamazon, RHEL, FreeBSD
-	CpeNames         []string
-}
-
-// FindByCveID find by CVEID
-func (s VulnInfos) FindByCveID(cveID string) (VulnInfo, bool) {
-	for _, p := range s {
-		if cveID == p.CveID {
-			return p, true
-		}
-	}
-	return VulnInfo{CveID: cveID}, false
-}
-
-// immutable
-func (s VulnInfos) set(cveID string, v VulnInfo) VulnInfos {
-	for i, p := range s {
-		if cveID == p.CveID {
-			s[i] = v
-			return s
-		}
-	}
-	return append(s, v)
-}
-
-// Len implement Sort Interface
-func (s VulnInfos) Len() int {
-	return len(s)
-}
-
-// Swap implement Sort Interface
-func (s VulnInfos) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-// Less implement Sort Interface
-func (s VulnInfos) Less(i, j int) bool {
-	return s[i].CveDetail.CvssScore(config.Conf.Lang) >
-		s[j].CveDetail.CvssScore(config.Conf.Lang)
 }
 
 func detectOS(c config.ServerInfo) (osType osTypeInterface) {
@@ -577,6 +528,9 @@ func scanVulns(jsonDir string, scannedAt time.Time) []error {
 
 		return nil
 	}, timeoutSec)
+
+	//TODO
+	pp.Println(results)
 
 	config.Conf.FormatOneLineText = true
 	config.Conf.FormatJSON = true

@@ -57,16 +57,13 @@ type ScanResult struct {
 	ScannedAt time.Time
 
 	ServerName string // TOML Section key
-	//  Hostname    string
-	Family  string
-	Release string
+	Family     string
+	Release    string
+	Container  Container
+	Platform   Platform
 
-	Container Container
+	ScannedCves []VulnInfo
 
-	Platform Platform
-
-	//  Fqdn        string
-	//  NWLinks     []NWLink
 	KnownCves   []CveInfo
 	UnknownCves []CveInfo
 	IgnoredCves []CveInfo
@@ -185,6 +182,53 @@ type NWLink struct {
 	LinkState string
 }
 
+// VulnInfos is VulnInfo list, getter/setter, sortable methods.
+type VulnInfos []VulnInfo
+
+// VulnInfo holds a vulnerability information and unsecure packages
+type VulnInfo struct {
+	CveID            string
+	Packages         PackageInfoList
+	DistroAdvisories []DistroAdvisory // for Aamazon, RHEL, FreeBSD
+	CpeNames         []string
+}
+
+// FindByCveID find by CVEID
+func (s VulnInfos) FindByCveID(cveID string) (VulnInfo, bool) {
+	for _, p := range s {
+		if cveID == p.CveID {
+			return p, true
+		}
+	}
+	return VulnInfo{CveID: cveID}, false
+}
+
+// immutable
+func (s VulnInfos) set(cveID string, v VulnInfo) VulnInfos {
+	for i, p := range s {
+		if cveID == p.CveID {
+			s[i] = v
+			return s
+		}
+	}
+	return append(s, v)
+}
+
+// Len implement Sort Interface
+func (s VulnInfos) Len() int {
+	return len(s)
+}
+
+// Swap implement Sort Interface
+func (s VulnInfos) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+// Less implement Sort Interface
+func (s VulnInfos) Less(i, j int) bool {
+	return s[i].CveID < s[j].CveID
+}
+
 // CveInfos is for sorting
 type CveInfos []CveInfo
 
@@ -206,15 +250,8 @@ func (c CveInfos) Less(i, j int) bool {
 
 // CveInfo has Cve Information.
 type CveInfo struct {
-	CveDetail        cve.CveDetail
-	Packages         []PackageInfo
-	DistroAdvisories []DistroAdvisory
-	CpeNames         []CpeName
-}
-
-// CpeName has CPE name
-type CpeName struct {
-	Name string
+	CveDetail cve.CveDetail
+	VulnInfo
 }
 
 // PackageInfoList is slice of PackageInfo

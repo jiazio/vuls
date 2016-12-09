@@ -644,7 +644,7 @@ type dataForTmpl struct {
 	VulnSiteLinks    []string
 	References       []cve.Reference
 	Packages         []string
-	CpeNames         []models.CpeName
+	CpeNames         []string
 	PublishedDate    time.Time
 	LastModifiedDate time.Time
 }
@@ -758,8 +758,8 @@ Package/CPE
 {{range $pack := .Packages -}}
 * {{$pack}}
 {{end -}}
-{{range .CpeNames -}}
-* {{.Name}}
+{{range $name := .CpeNames -}}
+* {{$name}}
 {{end}}
 Links
 --------------

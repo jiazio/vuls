@@ -26,7 +26,6 @@ import (
 
 	"github.com/future-architect/vuls/cache"
 	"github.com/future-architect/vuls/config"
-	"github.com/future-architect/vuls/cveapi"
 	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/util"
 )
@@ -179,7 +178,7 @@ func (o *debian) scanPackages() error {
 	}
 	o.setPackages(packs)
 
-	var unsecurePacks []VulnInfo
+	var unsecurePacks []models.VulnInfo
 	if unsecurePacks, err = o.scanUnsecurePackages(packs); err != nil {
 		o.log.Errorf("Failed to scan vulnerable packages")
 		return err
@@ -242,7 +241,7 @@ func (o *debian) checkRequiredPackagesInstalled() error {
 	return nil
 }
 
-func (o *debian) scanUnsecurePackages(installed []models.PackageInfo) ([]VulnInfo, error) {
+func (o *debian) scanUnsecurePackages(installed []models.PackageInfo) ([]models.VulnInfo, error) {
 	o.log.Infof("apt-get update...")
 	cmd := util.PrependProxyEnv("apt-get update")
 	if r := o.ssh(cmd, sudo); !r.isSuccess() {
@@ -400,7 +399,7 @@ func (o *debian) parseAptGetUpgrade(stdout string) (upgradableNames []string, er
 	return
 }
 
-func (o *debian) scanVulnInfos(upgradablePacks []models.PackageInfo) (VulnInfos, error) {
+func (o *debian) scanVulnInfos(upgradablePacks []models.PackageInfo) (models.VulnInfos, error) {
 	meta := cache.Meta{
 		Name:   o.getServerInfo().GetServerName(),
 		Distro: o.getServerInfo().Distro,
@@ -485,18 +484,11 @@ func (o *debian) scanVulnInfos(upgradablePacks []models.PackageInfo) (VulnInfos,
 		cveIDs = append(cveIDs, k)
 	}
 	o.log.Debugf("%d Cves are found. cves: %v", len(cveIDs), cveIDs)
-	o.log.Info("Fetching CVE details...")
-	cveDetails, err := cveapi.CveClient.FetchCveDetails(cveIDs)
-	if err != nil {
-		return nil, err
-	}
-	o.log.Info("Done")
-	var vinfos VulnInfos
-	for _, detail := range cveDetails {
-		vinfos = append(vinfos, VulnInfo{
-			CveID:     detail.CveID,
-			CveDetail: detail,
-			Packs:     cvePackages[detail.CveID],
+	var vinfos models.VulnInfos
+	for k, v := range cvePackages {
+		vinfos = append(vinfos, models.VulnInfo{
+			CveID:    k,
+			Packages: v,
 		})
 	}
 	return vinfos, nil

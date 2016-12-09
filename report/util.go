@@ -362,7 +362,6 @@ func distroLinks(cveInfo models.CveInfo, osFamily string) []distroLink {
 	}
 }
 
-//TODO
 // addPackageInfos add package information related the CVE to table
 func addPackageInfos(table *uitable.Table, packs []models.PackageInfo) *uitable.Table {
 	for i, p := range packs {
@@ -377,9 +376,9 @@ func addPackageInfos(table *uitable.Table, packs []models.PackageInfo) *uitable.
 	return table
 }
 
-func addCpeNames(table *uitable.Table, names []models.CpeName) *uitable.Table {
-	for _, p := range names {
-		table.AddRow("CPE", fmt.Sprintf("%s", p.Name))
+func addCpeNames(table *uitable.Table, names []string) *uitable.Table {
+	for _, n := range names {
+		table.AddRow("CPE", fmt.Sprintf("%s", n))
 	}
 	return table
 }

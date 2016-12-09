@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/future-architect/vuls/config"
-	"github.com/future-architect/vuls/cveapi"
 	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/util"
 
@@ -189,7 +188,7 @@ func (o *redhat) scanPackages() error {
 	}
 	o.setPackages(packs)
 
-	var vinfos []VulnInfo
+	var vinfos []models.VulnInfo
 	if vinfos, err = o.scanVulnInfos(); err != nil {
 		o.log.Errorf("Failed to scan vulnerable packages")
 		return err
@@ -235,7 +234,7 @@ func (o *redhat) parseScannedPackagesLine(line string) (models.PackageInfo, erro
 	}, nil
 }
 
-func (o *redhat) scanVulnInfos() ([]VulnInfo, error) {
+func (o *redhat) scanVulnInfos() ([]models.VulnInfo, error) {
 	if o.Distro.Family != "centos" {
 		// Amazon, RHEL has yum updateinfo as default
 		// yum updateinfo can collenct vendor advisory information.
@@ -247,7 +246,7 @@ func (o *redhat) scanVulnInfos() ([]VulnInfo, error) {
 }
 
 // For CentOS
-func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (VulnInfos, error) {
+func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (models.VulnInfos, error) {
 	cmd := "LANGUAGE=en_US.UTF-8 yum --color=never %s check-update"
 	if o.getServerInfo().Enablerepo != "" {
 		cmd = fmt.Sprintf(cmd, "--enablerepo="+o.getServerInfo().Enablerepo)
@@ -342,26 +341,12 @@ func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (VulnInfos, error) {
 		}
 	}
 
-	var uniqueCveIDs []string
-	for cveID := range cveIDPackInfoMap {
-		uniqueCveIDs = append(uniqueCveIDs, cveID)
-	}
-
-	// cveIDs => []cve.CveInfo
-	o.log.Info("Fetching CVE details...")
-	cveDetails, err := cveapi.CveClient.FetchCveDetails(uniqueCveIDs)
-	if err != nil {
-		return nil, err
-	}
-	o.log.Info("Done")
-
-	vinfos := []VulnInfo{}
-	for _, detail := range cveDetails {
+	vinfos := []models.VulnInfo{}
+	for k, v := range cveIDPackInfoMap {
 		// Amazon, RHEL do not use this method, so VendorAdvisory do not set.
-		vinfos = append(vinfos, VulnInfo{
-			CveID:     detail.CveID,
-			CveDetail: detail,
-			Packs:     cveIDPackInfoMap[detail.CveID],
+		vinfos = append(vinfos, models.VulnInfo{
+			CveID:    k,
+			Packages: v,
 		})
 	}
 	return vinfos, nil
@@ -574,7 +559,7 @@ type distroAdvisoryCveIDs struct {
 
 // Scaning unsecure packages using yum-plugin-security.
 // Amazon, RHEL
-func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (VulnInfos, error) {
+func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (models.VulnInfos, error) {
 	if o.Distro.Family == "centos" {
 		// CentOS has no security channel.
 		// So use yum check-update && parse changelog
@@ -640,40 +625,33 @@ func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (VulnInfos, error)
 	// All information collected.
 	// Convert to VulnInfos.
 	o.log.Info("Fetching CVE details...")
-	vinfos := VulnInfos{}
+	vinfos := models.VulnInfos{}
 	for _, advIDCveIDs := range advisoryCveIDsList {
-		cveDetails, err :=
-			cveapi.CveClient.FetchCveDetails(advIDCveIDs.CveIDs)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, cveDetail := range cveDetails {
+		for _, cveID := range advIDCveIDs.CveIDs {
 			found := false
 			for i, p := range vinfos {
-				if cveDetail.CveID == p.CveID {
+				if cveID == p.CveID {
 					advAppended := append(p.DistroAdvisories, advIDCveIDs.DistroAdvisory)
 					vinfos[i].DistroAdvisories = advAppended
 
 					packs := dict[advIDCveIDs.DistroAdvisory.AdvisoryID]
-					vinfos[i].Packs = append(vinfos[i].Packs, packs...)
+					vinfos[i].Packages = append(vinfos[i].Packages, packs...)
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				cpinfo := VulnInfo{
-					CveID:            cveDetail.CveID,
-					CveDetail:        cveDetail,
+				cpinfo := models.VulnInfo{
+					CveID:            cveID,
 					DistroAdvisories: []models.DistroAdvisory{advIDCveIDs.DistroAdvisory},
-					Packs:            dict[advIDCveIDs.DistroAdvisory.AdvisoryID],
+					Packages:         dict[advIDCveIDs.DistroAdvisory.AdvisoryID],
 				}
 				vinfos = append(vinfos, cpinfo)
 			}
+
 		}
 	}
-	o.log.Info("Done")
 	return vinfos, nil
 }
 

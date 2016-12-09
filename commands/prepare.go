@@ -50,8 +50,9 @@ func (*PrepareCmd) Synopsis() string {
 	return `Install required packages to scan.
 				CentOS: yum-plugin-security, yum-plugin-changelog
 				Amazon: None
-				RHEL:   TODO
+				RHEL:   None
 				Ubuntu: None
+				Debian: aptitude
 
 	`
 }
