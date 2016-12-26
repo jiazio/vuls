@@ -129,7 +129,6 @@ func (api cvedictClient) FetchCveDetails(cveIDs []string) (cveDetails cve.CveDet
 			fmt.Errorf("Failed to fetch CVE. err: %v", errs)
 	}
 
-	// order by CVE ID desc
 	sort.Sort(cveDetails)
 	return
 }

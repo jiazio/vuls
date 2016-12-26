@@ -55,7 +55,6 @@ type osTypeInterface interface {
 
 	checkRequiredPackagesInstalled() error
 	scanPackages() error
-	scanVulnByCpeName() error
 	install() error
 	convertToModel() (models.ScanResult, error)
 
@@ -511,10 +510,6 @@ func scanVulns(jsonDir string, scannedAt time.Time) []error {
 	timeoutSec := 120 * 60
 	errs := parallelSSHExec(func(o osTypeInterface) error {
 		if err := o.scanPackages(); err != nil {
-			return err
-		}
-
-		if err := o.scanVulnByCpeName(); err != nil {
 			return err
 		}
 

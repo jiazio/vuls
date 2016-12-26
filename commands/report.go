@@ -37,6 +37,7 @@ import (
 type ReportCmd struct {
 	lang               string
 	debug              bool
+	debugSQL           bool
 	configPath         string
 	resultsDir         string
 	cvssScoreOver      float64
@@ -107,6 +108,7 @@ func (*ReportCmd) Usage() string {
 		[-azure-container=container]
 		[-http-proxy=http://192.168.0.1:8080]
 		[-debug]
+		[-debug-sql]
 
 		[SERVER]...
 `
@@ -116,6 +118,7 @@ func (*ReportCmd) Usage() string {
 func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.lang, "lang", "en", "[en|ja]")
 	f.BoolVar(&p.debug, "debug", false, "debug mode")
+	f.BoolVar(&p.debugSQL, "debug-sql", false, "SQL debug mode")
 
 	wd, _ := os.Getwd()
 
@@ -222,6 +225,7 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 // Execute execute
 func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	c.Conf.Debug = p.debug
+	c.Conf.DebugSQL = p.debugSQL
 	Log := util.NewCustomLogger(c.ServerInfo{})
 
 	if err := c.Load(p.configPath, ""); err != nil {
@@ -328,8 +332,24 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	}
 
 	history, err := loadOneScanHistory(jsonDir)
-	var res models.ScanResults
+
+	var results []models.ScanResult
 	for _, r := range history.ScanResults {
+		sInfo := c.Conf.Servers[r.ServerName]
+		vs, err := scanVulnByCpeNames(sInfo.CpeNames)
+		if err != nil {
+			return subcommands.ExitFailure
+		}
+		r.CpeNamesCves = vs
+		filled, err := r.FillCveDetail()
+		if err != nil {
+			return subcommands.ExitFailure
+		}
+		results = append(results, filled)
+	}
+
+	var res models.ScanResults
+	for _, r := range results {
 		res = append(res, r.FilterByCvssOver())
 	}
 	for _, w := range reports {
@@ -338,6 +358,38 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 			return subcommands.ExitFailure
 		}
 	}
-
 	return subcommands.ExitSuccess
+}
+
+func scanVulnByCpeNames(cpeNames []string) ([]models.VulnInfo,
+	error) {
+	vinfos := []models.VulnInfo{}
+
+	// To remove duplicate
+	set := map[string]models.VulnInfo{}
+
+	for _, name := range cpeNames {
+		details, err := cveapi.CveClient.FetchCveDetailsByCpeName(name)
+		if err != nil {
+			return nil, err
+		}
+		for _, detail := range details {
+			if val, ok := set[detail.CveID]; ok {
+				names := val.CpeNames
+				names = append(names, name)
+				val.CpeNames = names
+				set[detail.CveID] = val
+			} else {
+				set[detail.CveID] = models.VulnInfo{
+					CveID:    detail.CveID,
+					CpeNames: []string{name},
+				}
+			}
+		}
+	}
+
+	for key := range set {
+		vinfos = append(vinfos, set[key])
+	}
+	return vinfos, nil
 }

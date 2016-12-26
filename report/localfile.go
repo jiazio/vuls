@@ -30,7 +30,7 @@ import (
 	"github.com/future-architect/vuls/models"
 )
 
-// LocalFileWriter writes results to file.
+// LocalFileWriter writes results to a local file.
 type LocalFileWriter struct {
 	CurrentDir string
 }

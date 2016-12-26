@@ -26,7 +26,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/future-architect/vuls/config"
-	"github.com/future-architect/vuls/cveapi"
 	"github.com/future-architect/vuls/models"
 )
 
@@ -244,44 +243,6 @@ func (l *base) convertToModel() (models.ScanResult, error) {
 		ScannedCves: l.VulnInfos,
 		Optional:    l.ServerInfo.Optional,
 	}, nil
-}
-
-// scanVulnByCpeName search vulnerabilities that specified in config file.
-func (l *base) scanVulnByCpeName() error {
-	unsecurePacks := models.VulnInfos{}
-
-	serverInfo := l.getServerInfo()
-	cpeNames := serverInfo.CpeNames
-
-	// For remove duplicate
-	set := map[string]models.VulnInfo{}
-
-	for _, name := range cpeNames {
-		details, err := cveapi.CveClient.FetchCveDetailsByCpeName(name)
-		if err != nil {
-			return err
-		}
-		for _, detail := range details {
-			if val, ok := set[detail.CveID]; ok {
-				names := val.CpeNames
-				names = append(names, name)
-				val.CpeNames = names
-				set[detail.CveID] = val
-			} else {
-				set[detail.CveID] = models.VulnInfo{
-					CveID:    detail.CveID,
-					CpeNames: []string{name},
-				}
-			}
-		}
-	}
-
-	for key := range set {
-		unsecurePacks = append(unsecurePacks, set[key])
-	}
-	unsecurePacks = append(unsecurePacks, l.VulnInfos...)
-	l.setVulnInfos(unsecurePacks)
-	return nil
 }
 
 func (l *base) setErrs(errs []error) {

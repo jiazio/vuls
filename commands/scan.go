@@ -37,7 +37,6 @@ import (
 // ScanCmd is Subcommand of host discovery mode
 type ScanCmd struct {
 	debug          bool
-	debugSQL       bool
 	configPath     string
 	resultsDir     string
 	cacheDBPath    string
@@ -67,7 +66,6 @@ func (*ScanCmd) Usage() string {
 		[-http-proxy=http://192.168.0.1:8080]
 		[-ask-key-password]
 		[-debug]
-		[-debug-sql]
 
 		[SERVER]...
 `
@@ -76,7 +74,6 @@ func (*ScanCmd) Usage() string {
 // SetFlags set flag
 func (p *ScanCmd) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&p.debug, "debug", false, "debug mode")
-	f.BoolVar(&p.debugSQL, "debug-sql", false, "SQL debug mode")
 
 	wd, _ := os.Getwd()
 
@@ -185,8 +182,6 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 		c.Conf.Servers = target
 	}
 	logrus.Debugf("%s", pp.Sprintf("%v", target))
-
-	c.Conf.DebugSQL = p.debugSQL
 
 	// logger
 	Log := util.NewCustomLogger(c.ServerInfo{})

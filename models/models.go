@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/future-architect/vuls/config"
+	"github.com/future-architect/vuls/cveapi"
 	cve "github.com/kotakanbe/go-cve-dictionary/models"
 )
 
@@ -62,13 +63,71 @@ type ScanResult struct {
 	Container  Container
 	Platform   Platform
 
-	ScannedCves []VulnInfo
+	ScannedCves  []VulnInfo
+	CpeNamesCves []VulnInfo
 
 	KnownCves   []CveInfo
 	UnknownCves []CveInfo
 	IgnoredCves []CveInfo
 
 	Optional [][]interface{}
+}
+
+// FillCveDetail fetches CVE detailed information from
+// CVE Database, and then set to fields.
+func (r ScanResult) FillCveDetail() (ScanResult, error) {
+	vInfos := append(r.ScannedCves, r.CpeNamesCves...)
+
+	set := map[string]VulnInfo{}
+	var cveIDs []string
+	for _, v := range vInfos {
+		set[v.CveID] = v
+		cveIDs = append(cveIDs, v.CveID)
+	}
+
+	ds, err := cveapi.CveClient.FetchCveDetails(cveIDs)
+	if err != nil {
+		return r, err
+	}
+
+	icves := config.Conf.Servers[r.ServerName].IgnoreCves
+
+	var known, unknown, ignored CveInfos
+	for _, d := range ds {
+		cinfo := CveInfo{
+			CveDetail: d,
+			VulnInfo:  set[d.CveID],
+		}
+
+		// ignored
+		found := false
+		for _, icve := range icves {
+			if icve == d.CveID {
+				ignored = append(ignored, cinfo)
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+
+		// unknown
+		if d.CvssScore(config.Conf.Lang) <= 0 {
+			unknown = append(unknown, cinfo)
+			continue
+		}
+
+		// known
+		known = append(known, cinfo)
+	}
+	sort.Sort(known)
+	sort.Sort(unknown)
+	sort.Sort(ignored)
+	r.KnownCves = known
+	r.UnknownCves = unknown
+	r.IgnoredCves = ignored
+	return r, nil
 }
 
 // FilterByCvssOver is filter function.
