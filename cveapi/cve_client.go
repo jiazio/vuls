@@ -48,7 +48,7 @@ func (api *cvedictClient) initialize() {
 }
 
 func (api cvedictClient) CheckHealth() (ok bool, err error) {
-	if config.Conf.CveDBPath != "" {
+	if config.Conf.CveDictionaryURL == "" {
 		log.Debugf("get cve-dictionary from %s", config.Conf.CveDBType)
 		return true, nil
 	}
@@ -71,7 +71,7 @@ type response struct {
 }
 
 func (api cvedictClient) FetchCveDetails(cveIDs []string) (cveDetails cve.CveDetails, err error) {
-	if config.Conf.CveDBPath != "" {
+	if config.Conf.CveDictionaryURL == "" {
 		return api.FetchCveDetailsFromCveDB(cveIDs)
 	}
 
@@ -194,7 +194,7 @@ type responseGetCveDetailByCpeName struct {
 }
 
 func (api cvedictClient) FetchCveDetailsByCpeName(cpeName string) ([]cve.CveDetail, error) {
-	if config.Conf.CveDBPath != "" {
+	if config.Conf.CveDictionaryURL == "" {
 		return api.FetchCveDetailsByCpeNameFromDB(cpeName)
 	}
 

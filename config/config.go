@@ -73,9 +73,16 @@ type Config struct {
 	AzureContainer string
 }
 
-// Validate configuration
-func (c Config) Validate() bool {
+// ValidateOnScanning validates configuration
+func (c Config) ValidateOnScanning() bool {
 	errs := []error{}
+
+	if len(c.ResultsDir) != 0 {
+		if ok, _ := valid.IsFilePath(c.ResultsDir); !ok {
+			errs = append(errs, fmt.Errorf(
+				"JSON base directory must be a *Absolute* file path. -results-dir: %s", c.ResultsDir))
+		}
+	}
 
 	if runtime.GOOS == "windows" && c.SSHExternal {
 		errs = append(errs, fmt.Errorf("-ssh-external cannot be used on windows"))
@@ -88,9 +95,34 @@ func (c Config) Validate() bool {
 		}
 	}
 
-	// If no valid DB type is set, default to sqlite3
-	if c.CveDBType == "" {
-		c.CveDBType = "sqlite3"
+	if len(c.CacheDBPath) != 0 {
+		if ok, _ := valid.IsFilePath(c.CacheDBPath); !ok {
+			errs = append(errs, fmt.Errorf(
+				"Cache DB path must be a *Absolute* file path. -cache-dbpath: %s", c.CacheDBPath))
+		}
+	}
+
+	_, err := valid.ValidateStruct(c)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	for _, err := range errs {
+		log.Error(err)
+	}
+
+	return len(errs) == 0
+}
+
+// ValidateOnReporting validates configuration
+func (c Config) ValidateOnReporting() bool {
+	errs := []error{}
+
+	if len(c.ResultsDir) != 0 {
+		if ok, _ := valid.IsFilePath(c.ResultsDir); !ok {
+			errs = append(errs, fmt.Errorf(
+				"JSON base directory must be a *Absolute* file path. -results-dir: %s", c.ResultsDir))
+		}
 	}
 
 	if c.CveDBType != "sqlite3" && c.CveDBType != "mysql" {
@@ -104,13 +136,6 @@ func (c Config) Validate() bool {
 				errs = append(errs, fmt.Errorf(
 					"SQLite3 DB(Cve Dictionary) path must be a *Absolute* file path. -cve-dictionary-dbpath: %s", c.CveDBPath))
 			}
-		}
-	}
-
-	if len(c.CacheDBPath) != 0 {
-		if ok, _ := valid.IsFilePath(c.CacheDBPath); !ok {
-			errs = append(errs, fmt.Errorf(
-				"Cache DB path must be a *Absolute* file path. -cache-dbpath: %s", c.CacheDBPath))
 		}
 	}
 

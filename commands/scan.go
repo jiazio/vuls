@@ -28,7 +28,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	c "github.com/future-architect/vuls/config"
-	"github.com/future-architect/vuls/cveapi"
 	"github.com/future-architect/vuls/scan"
 	"github.com/future-architect/vuls/util"
 	"github.com/google/subcommands"
@@ -37,19 +36,16 @@ import (
 
 // ScanCmd is Subcommand of host discovery mode
 type ScanCmd struct {
-	debug            bool
-	debugSQL         bool
-	configPath       string
-	resultsDir       string
-	cvedbtype        string
-	cvedbpath        string
-	cveDictionaryURL string
-	cacheDBPath      string
-	httpProxy        string
-	askKeyPassword   bool
-	containersOnly   bool
-	skipBroken       bool
-	sshExternal      bool
+	debug          bool
+	debugSQL       bool
+	configPath     string
+	resultsDir     string
+	cacheDBPath    string
+	httpProxy      string
+	askKeyPassword bool
+	containersOnly bool
+	skipBroken     bool
+	sshExternal    bool
 }
 
 // Name return subcommand name
@@ -64,9 +60,6 @@ func (*ScanCmd) Usage() string {
 	scan
 		[-config=/path/to/config.toml]
 		[-results-dir=/path/to/results]
-		[-cve-dictionary-dbtype=sqlite3|mysql]
-		[-cve-dictionary-dbpath=/path/to/cve.sqlite3 or mysql connection string]
-		[-cve-dictionary-url=http://127.0.0.1:1323]
 		[-cache-dbpath=/path/to/cache.db]
 		[-ssh-external]
 		[-containers-only]
@@ -92,25 +85,6 @@ func (p *ScanCmd) SetFlags(f *flag.FlagSet) {
 
 	defaultResultsDir := filepath.Join(wd, "results")
 	f.StringVar(&p.resultsDir, "results-dir", defaultResultsDir, "/path/to/results")
-
-	f.StringVar(
-		&p.cvedbtype,
-		"cve-dictionary-dbtype",
-		"sqlite3",
-		"DB type for fetching CVE dictionary (sqlite3 or mysql)")
-
-	f.StringVar(
-		&p.cvedbpath,
-		"cve-dictionary-dbpath",
-		"",
-		"/path/to/sqlite3 (For get cve detail from cve.sqlite3)")
-
-	defaultURL := "http://127.0.0.1:1323"
-	f.StringVar(
-		&p.cveDictionaryURL,
-		"cve-dictionary-url",
-		defaultURL,
-		"http://CVE.Dictionary")
 
 	defaultCacheDBPath := filepath.Join(wd, "cache.db")
 	f.StringVar(
@@ -173,13 +147,6 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 
 	logrus.Info("Start scanning")
 	logrus.Infof("config: %s", p.configPath)
-	if p.cvedbpath != "" {
-		if p.cvedbtype == "sqlite3" {
-			logrus.Infof("cve-dictionary: %s", p.cvedbpath)
-		}
-	} else {
-		logrus.Infof("cve-dictionary: %s", p.cveDictionaryURL)
-	}
 
 	var servernames []string
 	if 0 < len(f.Args()) {
@@ -225,9 +192,6 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 	Log := util.NewCustomLogger(c.ServerInfo{})
 
 	c.Conf.ResultsDir = p.resultsDir
-	c.Conf.CveDBType = p.cvedbtype
-	c.Conf.CveDBPath = p.cvedbpath
-	c.Conf.CveDictionaryURL = p.cveDictionaryURL
 	c.Conf.CacheDBPath = p.cacheDBPath
 	c.Conf.SSHExternal = p.sshExternal
 	c.Conf.HTTPProxy = p.httpProxy
@@ -235,14 +199,8 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 	c.Conf.SkipBroken = p.skipBroken
 
 	Log.Info("Validating Config...")
-	if !c.Conf.Validate() {
+	if !c.Conf.ValidateOnScanning() {
 		return subcommands.ExitUsageError
-	}
-
-	if ok, err := cveapi.CveClient.CheckHealth(); !ok {
-		Log.Errorf("CVE HTTP server is not running. err: %s", err)
-		Log.Errorf("Run go-cve-dictionary as server mode or specify -cve-dictionary-dbpath option")
-		return subcommands.ExitFailure
 	}
 
 	Log.Info("Detecting Server/Contianer OS... ")

@@ -24,8 +24,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Sirupsen/logrus"
 	c "github.com/future-architect/vuls/config"
+	"github.com/future-architect/vuls/cveapi"
 	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/report"
 	"github.com/future-architect/vuls/util"
@@ -42,6 +42,10 @@ type ReportCmd struct {
 	cvssScoreOver      float64
 	ignoreUnscoredCves bool
 	httpProxy          string
+
+	cvedbtype        string
+	cvedbpath        string
+	cveDictionaryURL string
 
 	toSlack     bool
 	toEMail     bool
@@ -79,6 +83,9 @@ func (*ReportCmd) Usage() string {
 		[-lang=en|ja]
 		[-config=/path/to/config.toml]
 		[-results-dir=/path/to/results]
+		[-cvedb-type=sqlite3|mysql]
+		[-cvedb-path=/path/to/cve.sqlite3 or mysql connection string]
+		[-cvedb-url=http://127.0.0.1:1323]
 		[-cvss-over=7]
 		[-ignore-unscored-cves]
 		[-to-email]
@@ -117,6 +124,25 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 
 	defaultResultsDir := filepath.Join(wd, "results")
 	f.StringVar(&p.resultsDir, "results-dir", defaultResultsDir, "/path/to/results")
+
+	f.StringVar(
+		&p.cvedbtype,
+		"cvedb-type",
+		"sqlite3",
+		"DB type for fetching CVE dictionary (sqlite3 or mysql)")
+
+	defaultCveDBPath := filepath.Join(wd, "cve.sqlite3")
+	f.StringVar(
+		&p.cvedbpath,
+		"cvedb-path",
+		defaultCveDBPath,
+		"/path/to/sqlite3 (For get cve detail from cve.sqlite3)")
+
+	f.StringVar(
+		&p.cveDictionaryURL,
+		"cvedb-url",
+		"",
+		"http://cve-dictionary.com:8080")
 
 	f.Float64Var(
 		&p.cvssScoreOver,
@@ -195,18 +221,19 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 
 // Execute execute
 func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	c.Conf.Debug = p.debug
+	Log := util.NewCustomLogger(c.ServerInfo{})
+
 	if err := c.Load(p.configPath, ""); err != nil {
-		logrus.Errorf("Error loading %s, %s", p.configPath, err)
+		Log.Errorf("Error loading %s, %s", p.configPath, err)
 		return subcommands.ExitUsageError
 	}
 
-	c.Conf.Debug = p.debug
 	c.Conf.Lang = p.lang
-
-	// logger
-	Log := util.NewCustomLogger(c.ServerInfo{})
-
 	c.Conf.ResultsDir = p.resultsDir
+	c.Conf.CveDBType = p.cvedbtype
+	c.Conf.CveDBPath = p.cvedbpath
+	c.Conf.CveDictionaryURL = p.cveDictionaryURL
 	c.Conf.CvssScoreOver = p.cvssScoreOver
 	c.Conf.IgnoreUnscoredCves = p.ignoreUnscoredCves
 	c.Conf.HTTPProxy = p.httpProxy
@@ -281,6 +308,23 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	if !(p.formatJSON || p.formatOneLineText ||
 		p.formatShortText || p.formatFullText || p.formatXML) {
 		c.Conf.FormatShortText = true
+	}
+
+	Log.Info("Validating Config...")
+	if !c.Conf.ValidateOnReporting() {
+		return subcommands.ExitUsageError
+	}
+	if ok, err := cveapi.CveClient.CheckHealth(); !ok {
+		Log.Errorf("CVE HTTP server is not running. err: %s", err)
+		Log.Errorf("Run go-cve-dictionary as server mode or specify -cve-dictionary-dbpath option")
+		return subcommands.ExitFailure
+	}
+	if c.Conf.CveDictionaryURL != "" {
+		Log.Infof("cve-dictionary: %s", c.Conf.CveDictionaryURL)
+	} else {
+		if c.Conf.CveDBType == "sqlite3" {
+			Log.Infof("cve-dictionary: %s", c.Conf.CveDBPath)
+		}
 	}
 
 	history, err := loadOneScanHistory(jsonDir)
