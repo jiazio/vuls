@@ -42,8 +42,8 @@ type Config struct {
 
 	CveDictionaryURL string `valid:"url"`
 
-	CvssScoreOver      float64
-	IgnoreUnscoredCves bool
+	CvssScoreOver     float64
+	IgnoreUnscoredCve bool
 
 	AssumeYes      bool
 	SSHExternal    bool
@@ -131,11 +131,9 @@ func (c Config) ValidateOnReporting() bool {
 	}
 
 	if c.CveDBType == "sqlite3" {
-		if len(c.CveDBPath) != 0 {
-			if ok, _ := valid.IsFilePath(c.CveDBPath); !ok {
-				errs = append(errs, fmt.Errorf(
-					"SQLite3 DB(Cve Dictionary) path must be a *Absolute* file path. -cve-dictionary-dbpath: %s", c.CveDBPath))
-			}
+		if ok, _ := valid.IsFilePath(c.CveDBPath); !ok {
+			errs = append(errs, fmt.Errorf(
+				"SQLite3 DB(CVE-Dictionary) path must be a *Absolute* file path. -cve-dictionary-dbpath: %s", c.CveDBPath))
 		}
 	}
 
@@ -150,6 +148,36 @@ func (c Config) ValidateOnReporting() bool {
 
 	if slackerrs := c.Slack.Validate(); 0 < len(slackerrs) {
 		errs = append(errs, slackerrs...)
+	}
+
+	for _, err := range errs {
+		log.Error(err)
+	}
+
+	return len(errs) == 0
+}
+
+// ValidateOnTui validates configuration
+func (c Config) ValidateOnTui() bool {
+	errs := []error{}
+
+	if len(c.ResultsDir) != 0 {
+		if ok, _ := valid.IsFilePath(c.ResultsDir); !ok {
+			errs = append(errs, fmt.Errorf(
+				"JSON base directory must be a *Absolute* file path. -results-dir: %s", c.ResultsDir))
+		}
+	}
+
+	if c.CveDBType != "sqlite3" && c.CveDBType != "mysql" {
+		errs = append(errs, fmt.Errorf(
+			"CVE DB type must be either 'sqlite3' or 'mysql'.  -cve-dictionary-dbtype: %s", c.CveDBType))
+	}
+
+	if c.CveDBType == "sqlite3" {
+		if ok, _ := valid.IsFilePath(c.CveDBPath); !ok {
+			errs = append(errs, fmt.Errorf(
+				"SQLite3 DB(CVE-Dictionary) path must be a *Absolute* file path. -cve-dictionary-dbpath: %s", c.CveDBPath))
+		}
 	}
 
 	for _, err := range errs {

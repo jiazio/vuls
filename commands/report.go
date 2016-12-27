@@ -35,14 +35,16 @@ import (
 
 // ReportCmd is subcommand for reporting
 type ReportCmd struct {
-	lang               string
-	debug              bool
-	debugSQL           bool
-	configPath         string
-	resultsDir         string
-	cvssScoreOver      float64
-	ignoreUnscoredCves bool
-	httpProxy          string
+	lang       string
+	debug      bool
+	debugSQL   bool
+	configPath string
+	resultsDir string
+	refreshCve bool
+
+	cvssScoreOver     float64
+	ignoreUnscoredCve bool
+	httpProxy         string
 
 	cvedbtype        string
 	cvedbpath        string
@@ -84,9 +86,10 @@ func (*ReportCmd) Usage() string {
 		[-lang=en|ja]
 		[-config=/path/to/config.toml]
 		[-results-dir=/path/to/results]
+		[-refresh-cve]
 		[-cvedb-type=sqlite3|mysql]
-		[-cvedb-path=/path/to/cve.sqlite3 or mysql connection string]
-		[-cvedb-url=http://127.0.0.1:1323]
+		[-cvedb-path=/path/to/cve.sqlite3]
+		[-cvedb-url=http://127.0.0.1:1323 or mysql connection string]
 		[-cvss-over=7]
 		[-ignore-unscored-cves]
 		[-to-email]
@@ -128,6 +131,12 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 	defaultResultsDir := filepath.Join(wd, "results")
 	f.StringVar(&p.resultsDir, "results-dir", defaultResultsDir, "/path/to/results")
 
+	f.BoolVar(
+		&p.refreshCve,
+		"refresh-cve",
+		false,
+		"Refresh CVE information in JSON file under results dir")
+
 	f.StringVar(
 		&p.cvedbtype,
 		"cvedb-type",
@@ -145,7 +154,7 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 		&p.cveDictionaryURL,
 		"cvedb-url",
 		"",
-		"http://cve-dictionary.com:8080")
+		"http://cve-dictionary.com:8080 or mysql connection string")
 
 	f.Float64Var(
 		&p.cvssScoreOver,
@@ -154,8 +163,8 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 		"-cvss-over=6.5 means reporting CVSS Score 6.5 and over (default: 0 (means report all))")
 
 	f.BoolVar(
-		&p.ignoreUnscoredCves,
-		"ignore-unscored-cves",
+		&p.ignoreUnscoredCve,
+		"ignore-unscored-cve",
 		false,
 		"Don't report the unscored CVEs")
 
@@ -239,7 +248,7 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	c.Conf.CveDBPath = p.cvedbpath
 	c.Conf.CveDictionaryURL = p.cveDictionaryURL
 	c.Conf.CvssScoreOver = p.cvssScoreOver
-	c.Conf.IgnoreUnscoredCves = p.ignoreUnscoredCves
+	c.Conf.IgnoreUnscoredCve = p.ignoreUnscoredCve
 	c.Conf.HTTPProxy = p.httpProxy
 
 	jsonDir, err := jsonDir(f.Args())
@@ -320,7 +329,7 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	}
 	if ok, err := cveapi.CveClient.CheckHealth(); !ok {
 		Log.Errorf("CVE HTTP server is not running. err: %s", err)
-		Log.Errorf("Run go-cve-dictionary as server mode or specify -cve-dictionary-dbpath option")
+		Log.Errorf("Run go-cve-dictionary as server mode before reporting or run with --cvedb-path option")
 		return subcommands.ExitFailure
 	}
 	if c.Conf.CveDictionaryURL != "" {
@@ -335,17 +344,29 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 
 	var results []models.ScanResult
 	for _, r := range history.ScanResults {
-		sInfo := c.Conf.Servers[r.ServerName]
-		vs, err := scanVulnByCpeNames(sInfo.CpeNames, r.ScannedCves)
-		if err != nil {
-			return subcommands.ExitFailure
+		if p.refreshCve || needToRefreshCve(r) {
+			if c.Conf.CveDBType == "sqlite3" {
+				if _, err := os.Stat(c.Conf.CveDBPath); os.IsNotExist(err) {
+					log.Errorf("SQLite3 DB(CVE-Dictionary) is not exist: %s",
+						c.Conf.CveDBPath)
+					return subcommands.ExitFailure
+				}
+			}
+
+			filled, err := fillCveInfoFromCveDB(r)
+			if err != nil {
+				Log.Errorf("Failed to fill CVE information: %s", err)
+				return subcommands.ExitFailure
+			}
+
+			if err := overwriteJSONFile(jsonDir, filled); err != nil {
+				Log.Errorf("Failed to write JSON: %s", err)
+				return subcommands.ExitFailure
+			}
+			results = append(results, filled)
+		} else {
+			results = append(results, r)
 		}
-		r.ScannedCves = vs
-		filled, err := r.FillCveDetail()
-		if err != nil {
-			return subcommands.ExitFailure
-		}
-		results = append(results, filled)
 	}
 
 	var res models.ScanResults
@@ -354,44 +375,9 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	}
 	for _, w := range reports {
 		if err := w.Write(res...); err != nil {
-			Log.Fatalf("Failed to report, err: %s", err)
+			Log.Errorf("Failed to report: %s", err)
 			return subcommands.ExitFailure
 		}
 	}
 	return subcommands.ExitSuccess
-}
-
-func scanVulnByCpeNames(cpeNames []string, scannedVulns []models.VulnInfo) ([]models.VulnInfo,
-	error) {
-	// To remove duplicate
-	set := map[string]models.VulnInfo{}
-	for _, v := range scannedVulns {
-		set[v.CveID] = v
-	}
-
-	for _, name := range cpeNames {
-		details, err := cveapi.CveClient.FetchCveDetailsByCpeName(name)
-		if err != nil {
-			return nil, err
-		}
-		for _, detail := range details {
-			if val, ok := set[detail.CveID]; ok {
-				names := val.CpeNames
-				names = util.AppendIfMissing(names, name)
-				val.CpeNames = names
-				set[detail.CveID] = val
-			} else {
-				set[detail.CveID] = models.VulnInfo{
-					CveID:    detail.CveID,
-					CpeNames: []string{name},
-				}
-			}
-		}
-	}
-
-	vinfos := []models.VulnInfo{}
-	for key := range set {
-		vinfos = append(vinfos, set[key])
-	}
-	return vinfos, nil
 }

@@ -136,7 +136,11 @@ func (api cvedictClient) FetchCveDetails(cveIDs []string) (cveDetails cve.CveDet
 func (api cvedictClient) FetchCveDetailsFromCveDB(cveIDs []string) (cveDetails cve.CveDetails, err error) {
 	log.Debugf("open cve-dictionary db (%s)", config.Conf.CveDBType)
 	cveconfig.Conf.DBType = config.Conf.CveDBType
-	cveconfig.Conf.DBPath = config.Conf.CveDBPath
+	if config.Conf.CveDBType == "sqlite3" {
+		cveconfig.Conf.DBPath = config.Conf.CveDBPath
+	} else {
+		cveconfig.Conf.DBPath = config.Conf.CveDictionaryURL
+	}
 	cveconfig.Conf.DebugSQL = config.Conf.DebugSQL
 	if err := cvedb.OpenDB(); err != nil {
 		return []cve.CveDetail{},

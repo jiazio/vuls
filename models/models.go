@@ -220,7 +220,7 @@ func (r ScanResult) CveSummary() string {
 		}
 	}
 
-	if config.Conf.IgnoreUnscoredCves {
+	if config.Conf.IgnoreUnscoredCve {
 		return fmt.Sprintf("Total: %d (High:%d Medium:%d Low:%d)",
 			high+medium+low, high, medium, low)
 	}

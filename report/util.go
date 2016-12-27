@@ -50,7 +50,7 @@ func toShortPlainText(r models.ScanResult) string {
 	stable.Wrap = true
 
 	cves := r.KnownCves
-	if !config.Conf.IgnoreUnscoredCves {
+	if !config.Conf.IgnoreUnscoredCve {
 		cves = append(cves, r.UnknownCves...)
 	}
 
@@ -142,7 +142,7 @@ No unsecure packages.
 	scoredReport, unscoredReport = toPlainTextDetails(r, r.Family)
 
 	unscored := ""
-	if !config.Conf.IgnoreUnscoredCves {
+	if !config.Conf.IgnoreUnscoredCve {
 		unscored = strings.Join(unscoredReport, "\n\n")
 	}
 

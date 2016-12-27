@@ -25,6 +25,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	c "github.com/future-architect/vuls/config"
+	"github.com/future-architect/vuls/models"
 	"github.com/future-architect/vuls/report"
 	"github.com/google/subcommands"
 )
@@ -34,6 +35,11 @@ type TuiCmd struct {
 	lang       string
 	debugSQL   bool
 	resultsDir string
+
+	refreshCve       bool
+	cvedbtype        string
+	cvedbpath        string
+	cveDictionaryURL string
 }
 
 // Name return subcommand name
@@ -47,6 +53,7 @@ func (*TuiCmd) Usage() string {
 	return `tui:
 	tui
 		[-results-dir=/path/to/results]
+		[-refresh-cve]
 
 `
 }
@@ -57,9 +64,33 @@ func (p *TuiCmd) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&p.debugSQL, "debug-sql", false, "debug SQL")
 
 	wd, _ := os.Getwd()
-
 	defaultResultsDir := filepath.Join(wd, "results")
 	f.StringVar(&p.resultsDir, "results-dir", defaultResultsDir, "/path/to/results")
+
+	f.BoolVar(
+		&p.refreshCve,
+		"refresh-cve",
+		false,
+		"Refresh CVE information in JSON file under results dir")
+
+	f.StringVar(
+		&p.cvedbtype,
+		"cvedb-type",
+		"sqlite3",
+		"DB type for fetching CVE dictionary (sqlite3 or mysql)")
+
+	defaultCveDBPath := filepath.Join(wd, "cve.sqlite3")
+	f.StringVar(
+		&p.cvedbpath,
+		"cvedb-path",
+		defaultCveDBPath,
+		"/path/to/sqlite3 (For get cve detail from cve.sqlite3)")
+
+	f.StringVar(
+		&p.cveDictionaryURL,
+		"cvedb-url",
+		"",
+		"http://cve-dictionary.com:8080 or mysql connection string")
 }
 
 // Execute execute
@@ -67,6 +98,14 @@ func (p *TuiCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) s
 	c.Conf.Lang = "en"
 	c.Conf.DebugSQL = p.debugSQL
 	c.Conf.ResultsDir = p.resultsDir
+	c.Conf.CveDBType = p.cvedbtype
+	c.Conf.CveDBPath = p.cvedbpath
+	c.Conf.CveDictionaryURL = p.cveDictionaryURL
+
+	log.Info("Validating Config...")
+	if !c.Conf.ValidateOnTui() {
+		return subcommands.ExitUsageError
+	}
 
 	jsonDir, err := jsonDir(f.Args())
 	if err != nil {
@@ -79,5 +118,33 @@ func (p *TuiCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) s
 		log.Errorf("Failed to read from JSON: %s", err)
 		return subcommands.ExitFailure
 	}
+
+	var results []models.ScanResult
+	for _, r := range history.ScanResults {
+		if p.refreshCve || needToRefreshCve(r) {
+			if c.Conf.CveDBType == "sqlite3" {
+				if _, err := os.Stat(c.Conf.CveDBPath); os.IsNotExist(err) {
+					log.Errorf("SQLite3 DB(CVE-Dictionary) is not exist: %s",
+						c.Conf.CveDBPath)
+					return subcommands.ExitFailure
+				}
+			}
+
+			filled, err := fillCveInfoFromCveDB(r)
+			if err != nil {
+				log.Errorf("Failed to fill CVE information: %s", err)
+				return subcommands.ExitFailure
+			}
+
+			if err := overwriteJSONFile(jsonDir, filled); err != nil {
+				log.Errorf("Failed to write JSON: %s", err)
+				return subcommands.ExitFailure
+			}
+			results = append(results, filled)
+		} else {
+			results = append(results, r)
+		}
+	}
+	history.ScanResults = results
 	return report.RunTui(history)
 }

@@ -28,7 +28,10 @@ import (
 	"strings"
 
 	c "github.com/future-architect/vuls/config"
+	"github.com/future-architect/vuls/cveapi"
 	"github.com/future-architect/vuls/models"
+	"github.com/future-architect/vuls/report"
+	"github.com/future-architect/vuls/util"
 )
 
 // jsonDirPattern is file name pattern of JSON directory
@@ -152,4 +155,70 @@ func loadOneScanHistory(jsonDir string) (scanHistory models.ScanHistory, err err
 		ScanResults: results,
 	}
 	return
+}
+
+func fillCveInfoFromCveDB(r models.ScanResult) (filled models.ScanResult, err error) {
+	sInfo := c.Conf.Servers[r.ServerName]
+	vs, err := scanVulnByCpeNames(sInfo.CpeNames, r.ScannedCves)
+	if err != nil {
+		return
+	}
+	r.ScannedCves = vs
+	filled, err = r.FillCveDetail()
+	if err != nil {
+		return
+	}
+	return
+}
+
+func overwriteJSONFile(dir string, r models.ScanResult) error {
+	before := c.Conf.FormatJSON
+	c.Conf.FormatJSON = true
+	w := report.LocalFileWriter{CurrentDir: dir}
+	if err := w.Write(r); err != nil {
+		return fmt.Errorf("Failed to write summary report: %s", err)
+	}
+	c.Conf.FormatJSON = before
+	return nil
+}
+
+func scanVulnByCpeNames(cpeNames []string, scannedVulns []models.VulnInfo) ([]models.VulnInfo,
+	error) {
+	// To remove duplicate
+	set := map[string]models.VulnInfo{}
+	for _, v := range scannedVulns {
+		set[v.CveID] = v
+	}
+
+	for _, name := range cpeNames {
+		details, err := cveapi.CveClient.FetchCveDetailsByCpeName(name)
+		if err != nil {
+			return nil, err
+		}
+		for _, detail := range details {
+			if val, ok := set[detail.CveID]; ok {
+				names := val.CpeNames
+				names = util.AppendIfMissing(names, name)
+				val.CpeNames = names
+				set[detail.CveID] = val
+			} else {
+				set[detail.CveID] = models.VulnInfo{
+					CveID:    detail.CveID,
+					CpeNames: []string{name},
+				}
+			}
+		}
+	}
+
+	vinfos := []models.VulnInfo{}
+	for key := range set {
+		vinfos = append(vinfos, set[key])
+	}
+	return vinfos, nil
+}
+
+func needToRefreshCve(r models.ScanResult) bool {
+	return len(r.KnownCves) == 0 &&
+		len(r.UnknownCves) == 0 &&
+		len(r.IgnoredCves) == 0
 }
