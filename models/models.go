@@ -63,8 +63,8 @@ type ScanResult struct {
 	Container  Container
 	Platform   Platform
 
-	ScannedCves  []VulnInfo
-	CpeNamesCves []VulnInfo
+	// Scanned Vulns via SSH + CPE Vulns
+	ScannedCves []VulnInfo
 
 	KnownCves   []CveInfo
 	UnknownCves []CveInfo
@@ -76,11 +76,9 @@ type ScanResult struct {
 // FillCveDetail fetches CVE detailed information from
 // CVE Database, and then set to fields.
 func (r ScanResult) FillCveDetail() (ScanResult, error) {
-	vInfos := append(r.ScannedCves, r.CpeNamesCves...)
-
 	set := map[string]VulnInfo{}
 	var cveIDs []string
-	for _, v := range vInfos {
+	for _, v := range r.ScannedCves {
 		set[v.CveID] = v
 		cveIDs = append(cveIDs, v.CveID)
 	}

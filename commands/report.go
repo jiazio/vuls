@@ -336,11 +336,11 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	var results []models.ScanResult
 	for _, r := range history.ScanResults {
 		sInfo := c.Conf.Servers[r.ServerName]
-		vs, err := scanVulnByCpeNames(sInfo.CpeNames)
+		vs, err := scanVulnByCpeNames(sInfo.CpeNames, r.ScannedCves)
 		if err != nil {
 			return subcommands.ExitFailure
 		}
-		r.CpeNamesCves = vs
+		r.ScannedCves = vs
 		filled, err := r.FillCveDetail()
 		if err != nil {
 			return subcommands.ExitFailure
@@ -361,12 +361,13 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	return subcommands.ExitSuccess
 }
 
-func scanVulnByCpeNames(cpeNames []string) ([]models.VulnInfo,
+func scanVulnByCpeNames(cpeNames []string, scannedVulns []models.VulnInfo) ([]models.VulnInfo,
 	error) {
-	vinfos := []models.VulnInfo{}
-
 	// To remove duplicate
 	set := map[string]models.VulnInfo{}
+	for _, v := range scannedVulns {
+		set[v.CveID] = v
+	}
 
 	for _, name := range cpeNames {
 		details, err := cveapi.CveClient.FetchCveDetailsByCpeName(name)
@@ -376,7 +377,7 @@ func scanVulnByCpeNames(cpeNames []string) ([]models.VulnInfo,
 		for _, detail := range details {
 			if val, ok := set[detail.CveID]; ok {
 				names := val.CpeNames
-				names = append(names, name)
+				names = util.AppendIfMissing(names, name)
 				val.CpeNames = names
 				set[detail.CveID] = val
 			} else {
@@ -388,6 +389,7 @@ func scanVulnByCpeNames(cpeNames []string) ([]models.VulnInfo,
 		}
 	}
 
+	vinfos := []models.VulnInfo{}
 	for key := range set {
 		vinfos = append(vinfos, set[key])
 	}

@@ -367,7 +367,7 @@ func addPackageInfos(table *uitable.Table, packs []models.PackageInfo) *uitable.
 	for i, p := range packs {
 		var title string
 		if i == 0 {
-			title = "Package/CPE"
+			title = "Package"
 		}
 		ver := fmt.Sprintf(
 			"%s -> %s", p.ToStringCurrentVersion(), p.ToStringNewVersion())

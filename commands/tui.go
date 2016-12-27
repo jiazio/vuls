@@ -45,7 +45,8 @@ func (*TuiCmd) Synopsis() string { return "Run Tui view to anayze vulnerabilites
 // Usage return usage
 func (*TuiCmd) Usage() string {
 	return `tui:
-	tui [-results-dir=/path/to/results]
+	tui
+		[-results-dir=/path/to/results]
 
 `
 }
