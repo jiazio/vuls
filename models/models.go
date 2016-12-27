@@ -209,7 +209,9 @@ func (r ScanResult) CveSummary() string {
 	for _, cveInfo := range cves {
 		score := cveInfo.CveDetail.CvssScore(config.Conf.Lang)
 		switch {
-		case 7.0 < score:
+		case 7.0 <= score:
+			high++
+		case 4.0 <= score:
 			medium++
 		case 0 < score:
 			low++
