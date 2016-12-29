@@ -241,6 +241,7 @@ func (l *base) convertToModel() (models.ScanResult, error) {
 		Container:   container,
 		Platform:    l.Platform,
 		ScannedCves: l.VulnInfos,
+		Packages:    l.Packages,
 		Optional:    l.ServerInfo.Optional,
 	}, nil
 }

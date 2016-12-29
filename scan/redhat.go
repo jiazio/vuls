@@ -267,19 +267,23 @@ func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (models.VulnInfos, er
 	}
 	o.log.Debugf("%s", pp.Sprintf("%v", packInfoList))
 
+	// set candidate version info
+	o.Packages.MergeNewVersion(packInfoList)
+
 	// Collect CVE-IDs in changelog
 	type PackInfoCveIDs struct {
 		PackInfo models.PackageInfo
 		CveIDs   []string
 	}
 
-	// { packageName: changelog-lines }
-	var rpm2changelog map[string]*string
 	allChangelog, err := o.getAllChangelog(packInfoList)
 	if err != nil {
 		o.log.Errorf("Failed to getAllchangelog. err: %s", err)
 		return nil, err
 	}
+
+	// { packageName: changelog-lines }
+	var rpm2changelog map[string]*string
 	rpm2changelog, err = o.parseAllChangelog(allChangelog)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parseAllChangelog. err: %s", err)
@@ -594,6 +598,9 @@ func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (models.VulnInfos,
 		return nil, fmt.Errorf("Failed to parse %s. err: %s", cmd, err)
 	}
 	o.log.Debugf("%s", pp.Sprintf("%v", updatable))
+
+	// set candidate version info
+	o.Packages.MergeNewVersion(updatable)
 
 	dict := map[string][]models.PackageInfo{}
 	for _, advIDPackNames := range advIDPackNamesList {

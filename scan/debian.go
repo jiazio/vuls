@@ -269,6 +269,8 @@ func (o *debian) scanUnsecurePackages(installed []models.PackageInfo) ([]models.
 		return nil, fmt.Errorf("Failed to fill candidate versions. err: %s", err)
 	}
 
+	o.Packages.MergeNewVersion(upgradablePacks)
+
 	// Setup changelog cache
 	current := cache.Meta{
 		Name:   o.getServerInfo().GetServerName(),

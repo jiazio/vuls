@@ -70,6 +70,8 @@ type ScanResult struct {
 	UnknownCves []CveInfo
 	IgnoredCves []CveInfo
 
+	Packages []PackageInfo
+
 	Optional [][]interface{}
 }
 
@@ -352,6 +354,18 @@ func (ps PackageInfoList) FindByName(name string) (result PackageInfo, found boo
 		}
 	}
 	return PackageInfo{}, false
+}
+
+// MergeNewVersion merges candidate version information to the receiver struct
+func (ps PackageInfoList) MergeNewVersion(as PackageInfoList) {
+	for _, a := range as {
+		for i, p := range ps {
+			if p.Name == a.Name {
+				ps[i].NewVersion = a.NewVersion
+				ps[i].NewRelease = a.NewRelease
+			}
+		}
+	}
 }
 
 // Find search PackageInfo by name-version-release
