@@ -38,7 +38,7 @@ type LocalFileWriter struct {
 func (w LocalFileWriter) Write(rs ...models.ScanResult) (err error) {
 	if c.Conf.FormatOneLineText {
 		path := filepath.Join(w.CurrentDir, "summary.txt")
-		text := toOneLineSummary(rs)
+		text := toOneLineSummary(rs...)
 		if err := writeFile(path, []byte(text), 0600); err != nil {
 			return fmt.Errorf(
 				"Failed to write to file. path: %s, err: %s",

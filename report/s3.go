@@ -55,7 +55,7 @@ func (w S3Writer) Write(rs ...models.ScanResult) (err error) {
 	if c.Conf.FormatOneLineText {
 		timestr := rs[0].ScannedAt.Format(time.RFC3339)
 		k := fmt.Sprintf(timestr + "/summary.txt")
-		text := toOneLineSummary(rs)
+		text := toOneLineSummary(rs...)
 		if err := putObject(svc, k, []byte(text)); err != nil {
 			return err
 		}

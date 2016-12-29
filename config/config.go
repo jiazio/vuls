@@ -42,8 +42,8 @@ type Config struct {
 
 	CveDictionaryURL string `valid:"url"`
 
-	CvssScoreOver     float64
-	IgnoreUnscoredCve bool
+	CvssScoreOver      float64
+	IgnoreUnscoredCves bool
 
 	AssumeYes      bool
 	SSHExternal    bool

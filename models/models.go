@@ -70,7 +70,7 @@ type ScanResult struct {
 	UnknownCves []CveInfo
 	IgnoredCves []CveInfo
 
-	Packages []PackageInfo
+	Packages PackageInfoList
 
 	Optional [][]interface{}
 }
@@ -222,7 +222,7 @@ func (r ScanResult) CveSummary() string {
 		}
 	}
 
-	if config.Conf.IgnoreUnscoredCve {
+	if config.Conf.IgnoreUnscoredCves {
 		return fmt.Sprintf("Total: %d (High:%d Medium:%d Low:%d)",
 			high+medium+low, high, medium, low)
 	}
@@ -366,6 +366,22 @@ func (ps PackageInfoList) MergeNewVersion(as PackageInfoList) {
 			}
 		}
 	}
+}
+
+func (ps PackageInfoList) countUpdatablePacks() int {
+	count := 0
+	for _, p := range ps {
+		if len(p.NewVersion) != 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// ToUpdatablePacksSummary returns a summary of updatable packages
+func (ps PackageInfoList) ToUpdatablePacksSummary() string {
+	return fmt.Sprintf("%d updatable packages",
+		ps.countUpdatablePacks())
 }
 
 // Find search PackageInfo by name-version-release

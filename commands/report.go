@@ -42,9 +42,9 @@ type ReportCmd struct {
 	resultsDir string
 	refreshCve bool
 
-	cvssScoreOver     float64
-	ignoreUnscoredCve bool
-	httpProxy         string
+	cvssScoreOver      float64
+	ignoreUnscoredCves bool
+	httpProxy          string
 
 	cvedbtype        string
 	cvedbpath        string
@@ -163,8 +163,8 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 		"-cvss-over=6.5 means reporting CVSS Score 6.5 and over (default: 0 (means report all))")
 
 	f.BoolVar(
-		&p.ignoreUnscoredCve,
-		"ignore-unscored-cve",
+		&p.ignoreUnscoredCves,
+		"ignore-unscored-cves",
 		false,
 		"Don't report the unscored CVEs")
 
@@ -248,7 +248,7 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	c.Conf.CveDBPath = p.cvedbpath
 	c.Conf.CveDictionaryURL = p.cveDictionaryURL
 	c.Conf.CvssScoreOver = p.cvssScoreOver
-	c.Conf.IgnoreUnscoredCve = p.ignoreUnscoredCve
+	c.Conf.IgnoreUnscoredCves = p.ignoreUnscoredCves
 	c.Conf.HTTPProxy = p.httpProxy
 
 	jsonDir, err := jsonDir(f.Args())

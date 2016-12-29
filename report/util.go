@@ -27,17 +27,18 @@ import (
 	"github.com/gosuri/uitable"
 )
 
-const maxColWidth = 100
+const maxColWidth = 80
 
-func toOneLineSummary(rs []models.ScanResult) string {
+func toOneLineSummary(rs ...models.ScanResult) string {
 	table := uitable.New()
 	table.MaxColWidth = maxColWidth
 	table.Wrap = true
 	for _, r := range rs {
 		cols := []interface{}{
 			r.ServerName,
-			fmt.Sprintf("%s%s", r.Family, r.Release),
+			//  fmt.Sprintf("%s%s", r.Family, r.Release),
 			r.CveSummary(),
+			r.Packages.ToUpdatablePacksSummary(),
 		}
 		table.AddRow(cols...)
 	}
@@ -50,7 +51,7 @@ func toShortPlainText(r models.ScanResult) string {
 	stable.Wrap = true
 
 	cves := r.KnownCves
-	if !config.Conf.IgnoreUnscoredCve {
+	if !config.Conf.IgnoreUnscoredCves {
 		cves = append(cves, r.UnknownCves...)
 	}
 
@@ -58,26 +59,34 @@ func toShortPlainText(r models.ScanResult) string {
 	for i := 0; i < len(r.ServerInfo()); i++ {
 		buf.WriteString("=")
 	}
-	header := fmt.Sprintf("%s\n%s",
-		r.ServerInfo(), buf.String())
+	header := fmt.Sprintf("%s\n%s\n%s",
+		r.ServerInfo(), buf.String(), toOneLineSummary(r))
 
-	//TODO show a summary of upgradable packages
 	if len(cves) == 0 {
 		return fmt.Sprintf(`
 %s
-No unsecure packages.
-`, header)
+No CVE-IDs are found in updatable packages.
+%s
+`, header, r.Packages.ToUpdatablePacksSummary())
 	}
 
 	for _, d := range cves {
-		var scols []string
 
+		var packsVer string
+		for _, p := range d.Packages {
+			packsVer += fmt.Sprintf(
+				"%s -> %s\n", p.ToStringCurrentVersion(), p.ToStringNewVersion())
+		}
+
+		var scols []string
 		switch {
 		case config.Conf.Lang == "ja" &&
 			0 < d.CveDetail.Jvn.CvssScore():
-			summary := fmt.Sprintf("%s\n%s",
+			summary := fmt.Sprintf("%s\n%s\n%s\n%s",
 				d.CveDetail.Jvn.CveTitle(),
 				d.CveDetail.Jvn.Link(),
+				distroLinks(d, r.Family)[0].url,
+				packsVer,
 			)
 			scols = []string{
 				d.CveDetail.CveID,
@@ -89,10 +98,13 @@ No unsecure packages.
 			}
 
 		case 0 < d.CveDetail.CvssScore("en"):
-			summary := fmt.Sprintf("%s\n%s/%s",
+			summary := fmt.Sprintf("%s\n%s/%s\n%s\n%s",
 				d.CveDetail.Nvd.CveSummary(),
 				cveDetailsBaseURL,
-				d.CveDetail.CveID)
+				d.CveDetail.CveID,
+				distroLinks(d, r.Family)[0].url,
+				packsVer,
+			)
 			scols = []string{
 				d.CveDetail.CveID,
 				fmt.Sprintf("%-4.1f (%s)",
@@ -102,10 +114,12 @@ No unsecure packages.
 				summary,
 			}
 		default:
+			summary := fmt.Sprintf("%s\n%s",
+				distroLinks(d, r.Family)[0].url, packsVer)
 			scols = []string{
 				d.CveDetail.CveID,
 				"?",
-				distroLinks(d, r.Family)[0].url,
+				summary,
 			}
 		}
 
@@ -126,23 +140,22 @@ func toFullPlainText(r models.ScanResult) string {
 	for i := 0; i < len(serverInfo); i++ {
 		buf.WriteString("=")
 	}
-	header := fmt.Sprintf("%s\n%s",
-		serverInfo, buf.String())
+	header := fmt.Sprintf("%s\n%s\n%s",
+		serverInfo, buf.String(), toOneLineSummary(r))
 
-	//TODO show a summary of upgradable packages
 	if len(r.KnownCves) == 0 && len(r.UnknownCves) == 0 {
 		return fmt.Sprintf(`
 %s
-No unsecure packages.
-`, header)
+No CVE-IDs are found in updatable packages.
+%s
+`, header, r.Packages.ToUpdatablePacksSummary())
 	}
 
-	//  summary := toShortPlainText(r)
 	scoredReport, unscoredReport := []string{}, []string{}
 	scoredReport, unscoredReport = toPlainTextDetails(r, r.Family)
 
 	unscored := ""
-	if !config.Conf.IgnoreUnscoredCve {
+	if !config.Conf.IgnoreUnscoredCves {
 		unscored = strings.Join(unscoredReport, "\n\n")
 	}
 
@@ -206,6 +219,8 @@ func toPlainTextUnknownCve(cveInfo models.CveInfo, osFamily string) string {
 	for _, link := range dlinks {
 		dtable.AddRow(link.title, link.url)
 	}
+	dtable = addPackageInfos(dtable, cveInfo.Packages)
+	dtable = addCpeNames(dtable, cveInfo.CpeNames)
 
 	return fmt.Sprintf("%s", dtable)
 }

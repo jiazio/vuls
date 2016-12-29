@@ -52,7 +52,7 @@ func (w StdoutWriter) Write(rs ...models.ScanResult) error {
 		fmt.Print("\n\n")
 		fmt.Println("One Line Summary")
 		fmt.Println("================")
-		fmt.Println(toOneLineSummary(rs))
+		fmt.Println(toOneLineSummary(rs...))
 		fmt.Print("\n")
 	}
 
