@@ -29,6 +29,22 @@ import (
 
 const maxColWidth = 80
 
+func toScanSummary(rs ...models.ScanResult) string {
+	table := uitable.New()
+	table.MaxColWidth = maxColWidth
+	table.Wrap = true
+	for _, r := range rs {
+		cols := []interface{}{
+			r.ServerName,
+			fmt.Sprintf("%s%s", r.Family, r.Release),
+			fmt.Sprintf("%d CVEs", len(r.ScannedCves)),
+			r.Packages.ToUpdatablePacksSummary(),
+		}
+		table.AddRow(cols...)
+	}
+	return fmt.Sprintf("%s\n", table)
+}
+
 func toOneLineSummary(rs ...models.ScanResult) string {
 	table := uitable.New()
 	table.MaxColWidth = maxColWidth
@@ -36,7 +52,6 @@ func toOneLineSummary(rs ...models.ScanResult) string {
 	for _, r := range rs {
 		cols := []interface{}{
 			r.ServerName,
-			//  fmt.Sprintf("%s%s", r.Family, r.Release),
 			r.CveSummary(),
 			r.Packages.ToUpdatablePacksSummary(),
 		}
@@ -59,8 +74,12 @@ func toShortPlainText(r models.ScanResult) string {
 	for i := 0; i < len(r.ServerInfo()); i++ {
 		buf.WriteString("=")
 	}
-	header := fmt.Sprintf("%s\n%s\n%s",
-		r.ServerInfo(), buf.String(), toOneLineSummary(r))
+	header := fmt.Sprintf("%s\n%s\n%s\t%s\n\n",
+		r.ServerInfo(),
+		buf.String(),
+		r.CveSummary(),
+		r.Packages.ToUpdatablePacksSummary(),
+	)
 
 	if len(cves) == 0 {
 		return fmt.Sprintf(`
@@ -71,11 +90,13 @@ No CVE-IDs are found in updatable packages.
 	}
 
 	for _, d := range cves {
-
 		var packsVer string
 		for _, p := range d.Packages {
 			packsVer += fmt.Sprintf(
 				"%s -> %s\n", p.ToStringCurrentVersion(), p.ToStringNewVersion())
+		}
+		for _, n := range d.CpeNames {
+			packsVer += n
 		}
 
 		var scols []string
@@ -140,8 +161,12 @@ func toFullPlainText(r models.ScanResult) string {
 	for i := 0; i < len(serverInfo); i++ {
 		buf.WriteString("=")
 	}
-	header := fmt.Sprintf("%s\n%s\n%s",
-		serverInfo, buf.String(), toOneLineSummary(r))
+	header := fmt.Sprintf("%s\n%s\n%s\t%s\n",
+		r.ServerInfo(),
+		buf.String(),
+		r.CveSummary(),
+		r.Packages.ToUpdatablePacksSummary(),
+	)
 
 	if len(r.KnownCves) == 0 && len(r.UnknownCves) == 0 {
 		return fmt.Sprintf(`
