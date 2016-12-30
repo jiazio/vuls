@@ -17,9 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package models
 
-import "testing"
+import (
+	"reflect"
+	"testing"
 
-func TestPackageInfosUniqByName(t *testing.T) {
+	"github.com/k0kubun/pp"
+)
+
+func TestPackageInfoListUniqByName(t *testing.T) {
 	var test = struct {
 		in  PackageInfoList
 		out PackageInfoList
@@ -53,6 +58,40 @@ func TestPackageInfosUniqByName(t *testing.T) {
 	}
 }
 
+func TestMergeNewVersion(t *testing.T) {
+	var test = struct {
+		a        PackageInfoList
+		b        PackageInfoList
+		expected PackageInfoList
+	}{
+		PackageInfoList{
+			{
+				Name: "hoge",
+			},
+		},
+		PackageInfoList{
+			{
+				Name:       "hoge",
+				NewVersion: "1.0.0",
+				NewRelease: "release1",
+			},
+		},
+		PackageInfoList{
+			{
+				Name:       "hoge",
+				NewVersion: "1.0.0",
+				NewRelease: "release1",
+			},
+		},
+	}
+
+	test.a.MergeNewVersion(test.b)
+	if !reflect.DeepEqual(test.a, test.expected) {
+		e := pp.Sprintf("%v", test.a)
+		a := pp.Sprintf("%v", test.expected)
+		t.Errorf("expected %s, actual %s", e, a)
+	}
+}
 func TestVulnInfosSetGet(t *testing.T) {
 	var test = struct {
 		in  []string
